@@ -118,6 +118,16 @@ jobs:
           path: output/*.csv
 ```
 
+## Files
+
+| File | Description |
+|------|-------------|
+| `fetch_phone_number_events.py` | Main script — run this |
+| `helpers.py` | Supporting utilities (date range, map I/O, CSV helpers) |
+| `requirements.txt` | Python dependencies |
+| `.env.example` | Credential template — copy to `.env` |
+| `phone_number_map.example.json` | Example of the SID → E.164 map format maintained in `output/` |
+
 ## References
 
 - [Twilio Monitor Events API](https://www.twilio.com/docs/monitor/api)
