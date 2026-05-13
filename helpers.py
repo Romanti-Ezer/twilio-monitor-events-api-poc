@@ -20,7 +20,7 @@ CSV_FIELDS = [
     "description",
 ]
 
-MAP_FILE = "phone_number_map.json"
+MAP_FILE = "output/phone_number_map.json"
 
 
 def build_date_range(date_range: str):
@@ -33,7 +33,10 @@ def build_date_range(date_range: str):
 def load_map(path=MAP_FILE) -> dict:
     p = Path(path)
     if p.exists():
-        return json.loads(p.read_text())
+        try:
+            return json.loads(p.read_text())
+        except json.JSONDecodeError:
+            print(f"WARNING: {path} is corrupted, starting with empty map.")
     return {}
 
 
@@ -43,10 +46,11 @@ def save_map(number_map: dict, path=MAP_FILE):
 
 def refresh_map_from_api(client, number_map: dict):
     """Bulk-fetch all active IncomingPhoneNumbers and merge into the map.
+    page_size=1000 sets the batch size per request; the SDK auto-paginates.
     Existing entries (including deleted numbers) are preserved."""
-    page = client.incoming_phone_numbers.list(page_size=1000)
+    records = client.incoming_phone_numbers.list(page_size=1000)
     count = 0
-    for record in page:
+    for record in records:
         number_map[record.sid] = record.phone_number
         count += 1
     print(f"  {count} active numbers loaded into map")

@@ -61,6 +61,9 @@ def main():
     client = Client(account_sid, auth_token)
     start, end = build_date_range(args.date_range)
 
+    # Ensure output directory exists
+    Path("output").mkdir(exist_ok=True)
+
     # Load persistent SID → phone_number map and refresh with all active numbers
     number_map = load_map()
     print("Refreshing phone number map from API ...")
@@ -92,7 +95,7 @@ def main():
     # Sort chronologically and write to CSV
     all_events.sort(key=lambda e: str(e.event_date))
 
-    output_path = Path(args.output or f"phone_number_events_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+    output_path = Path(args.output or f"output/phone_number_events_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
     with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         writer.writeheader()
