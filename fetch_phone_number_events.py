@@ -3,9 +3,9 @@
 Fetch Twilio Monitor Events for phone numbers and export to CSV.
 
 Usage:
-    python fetch_phone_number_events.py --range week
-    python fetch_phone_number_events.py --range month
-    python fetch_phone_number_events.py --range week --output my_report.csv
+    python fetch_phone_number_events.py                        (last 7 days)
+    python fetch_phone_number_events.py --range month          (last 30 days)
+    python fetch_phone_number_events.py --range week --output report.csv
 """
 
 import argparse
@@ -15,21 +15,20 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import requests
-from requests.auth import HTTPBasicAuth
+from twilio.rest import Client
 
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    pass  # dotenv is optional if env vars are already set
+    pass
 
-MONITOR_EVENTS_URL = "https://monitor.twilio.com/v1/Events"
 PHONE_NUMBER_EVENT_TYPES = [
     "phone-number.created",
     "phone-number.updated",
     "phone-number.deleted",
 ]
+
 CSV_FIELDS = [
     "event_date",
     "event_type",
@@ -49,7 +48,7 @@ def parse_args():
         dest="date_range",
         choices=["week", "month"],
         default="week",
-        help="Date range to fetch: 'week' (last 7 days) or 'month' (last 30 days). Default: week",
+        help="Date range: 'week' (last 7 days) or 'month' (last 30 days). Default: week",
     )
     parser.add_argument(
         "--output",
@@ -63,50 +62,19 @@ def build_date_range(date_range: str):
     now = datetime.now(tz=timezone.utc)
     days = 7 if date_range == "week" else 30
     start = now - timedelta(days=days)
-    fmt = "%Y-%m-%dT%H:%M:%SZ"
-    return start.strftime(fmt), now.strftime(fmt)
+    return start, now
 
 
-def fetch_events_for_type(event_type: str, start_date: str, end_date: str, auth: HTTPBasicAuth) -> list[dict]:
-    events = []
-    url = MONITOR_EVENTS_URL
-    params = {
-        "EventType": event_type,
-        "StartDate": start_date,
-        "EndDate": end_date,
-        "PageSize": 1000,
-    }
-
-    while url:
-        response = requests.get(url, auth=auth, params=params, timeout=30)
-        if response.status_code != 200:
-            print(f"  ERROR {response.status_code}: {response.text}", file=sys.stderr)
-            response.raise_for_status()
-
-        payload = response.json()
-        page_events = [
-            e for e in payload.get("events", [])
-            if e.get("resource_type") == "phone-number"
-        ]
-        events.extend(page_events)
-
-        # After first request, params are encoded in next_page_url
-        params = {}
-        url = payload.get("meta", {}).get("next_page_url") or payload.get("next_page_url")
-
-    return events
-
-
-def event_to_row(event: dict) -> dict:
+def event_to_row(event) -> dict:
     return {
-        "event_date": event.get("event_date", ""),
-        "event_type": event.get("event_type", ""),
-        "resource_sid": event.get("resource_sid", ""),
-        "actor_sid": event.get("actor_sid", ""),
-        "actor_type": event.get("actor_type", ""),
-        "source": event.get("source", ""),
-        "source_ip_address": event.get("source_ip_address", ""),
-        "description": event.get("description", ""),
+        "event_date": event.event_date,
+        "event_type": event.event_type,
+        "resource_sid": event.resource_sid,
+        "actor_sid": event.actor_sid,
+        "actor_type": event.actor_type,
+        "source": event.source,
+        "source_ip_address": event.source_ip_address,
+        "description": event.description or "",
     }
 
 
@@ -116,23 +84,29 @@ def main():
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
     if not account_sid or not auth_token:
-        print("ERROR: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN must be set (in .env or environment).", file=sys.stderr)
+        print("ERROR: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN must be set.", file=sys.stderr)
         sys.exit(1)
 
-    auth = HTTPBasicAuth(account_sid, auth_token)
-    start_date, end_date = build_date_range(args.date_range)
+    client = Client(account_sid, auth_token)
+    start, end = build_date_range(args.date_range)
 
-    print(f"Fetching phone-number events from {start_date} to {end_date} ...")
+    print(f"Fetching phone-number events from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')} ...")
 
     all_events = []
     for event_type in PHONE_NUMBER_EVENT_TYPES:
         print(f"  {event_type} ... ", end="", flush=True)
-        events = fetch_events_for_type(event_type, start_date, end_date, auth)
+        events = [
+            e for e in client.monitor.v1.events.list(
+                event_type=event_type,
+                start_date=start,
+                end_date=end,
+            )
+            if e.resource_type == "phone-number"
+        ]
         print(f"{len(events)} events")
         all_events.extend(events)
 
-    # Sort chronologically
-    all_events.sort(key=lambda e: e.get("event_date", ""))
+    all_events.sort(key=lambda e: str(e.event_date))
 
     output_file = args.output or f"phone_number_events_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     output_path = Path(output_file)
