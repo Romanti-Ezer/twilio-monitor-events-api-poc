@@ -6,7 +6,7 @@
 
 ## How it works
 
-The script queries the [Twilio Monitor Events API](https://www.twilio.com/docs/monitor/api) for three phone number lifecycle events:
+The script queries the [Twilio Monitor Events API](https://www.twilio.com/docs/usage/monitor-events) for three phone number lifecycle events:
 
 - `phone-number.created` — a number was provisioned
 - `phone-number.updated` — a number's configuration changed
@@ -130,6 +130,6 @@ jobs:
 
 ## References
 
-- [Twilio Monitor Events API](https://www.twilio.com/docs/monitor/api)
+- [Twilio Monitor Events API](https://www.twilio.com/docs/usage/monitor-events)
 - [IncomingPhoneNumbers API](https://www.twilio.com/docs/phone-numbers/api/incomingphonenumber-resource)
 - [Twilio Python SDK](https://www.twilio.com/docs/libraries/python)
