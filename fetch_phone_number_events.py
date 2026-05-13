@@ -23,7 +23,11 @@ try:
 except ImportError:
     pass
 
-from helpers import PHONE_NUMBER_EVENT_TYPES, CSV_FIELDS, build_date_range, event_to_row
+from helpers import (
+    PHONE_NUMBER_EVENT_TYPES, CSV_FIELDS,
+    build_date_range, load_map, save_map, refresh_map_from_api,
+    resolve_number, event_to_row,
+)
 
 
 def parse_args():
@@ -56,9 +60,14 @@ def main():
     # Set up Twilio client and date range
     client = Client(account_sid, auth_token)
     start, end = build_date_range(args.date_range)
-    print(f"Fetching phone-number events from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')} ...")
+
+    # Load persistent SID → phone_number map and refresh with all active numbers
+    number_map = load_map()
+    print("Refreshing phone number map from API ...")
+    refresh_map_from_api(client, number_map)
 
     # Fetch events for each event type
+    print(f"\nFetching phone-number events from {start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')} ...")
     all_events = []
     for event_type in PHONE_NUMBER_EVENT_TYPES:
         print(f"  {event_type} ... ", end="", flush=True)
@@ -73,6 +82,13 @@ def main():
         print(f"{len(events)} events")
         all_events.extend(events)
 
+    # Resolve any SIDs not already in the map (e.g. numbers deleted before first run)
+    for event in all_events:
+        resolve_number(client, event.resource_sid, number_map)
+
+    # Save updated map back to disk
+    save_map(number_map)
+
     # Sort chronologically and write to CSV
     all_events.sort(key=lambda e: str(e.event_date))
 
@@ -81,7 +97,7 @@ def main():
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
         writer.writeheader()
         for event in all_events:
-            writer.writerow(event_to_row(event))
+            writer.writerow(event_to_row(event, number_map))
 
     print(f"\nDone. {len(all_events)} total events written to: {output_path}")
 
