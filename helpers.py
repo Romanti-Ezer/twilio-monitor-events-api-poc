@@ -41,14 +41,17 @@ def load_map(path=MAP_FILE) -> dict:
 
 
 def save_map(number_map: dict, path=MAP_FILE):
-    Path(path).write_text(json.dumps(number_map, indent=2))
+    p = Path(path)
+    tmp = p.with_suffix(".tmp")
+    tmp.write_text(json.dumps(number_map, indent=2))
+    tmp.replace(p)  # atomic rename — prevents corruption on interrupted write
 
 
 def refresh_map_from_api(client, number_map: dict):
     """Bulk-fetch all active IncomingPhoneNumbers and merge into the map.
     page_size=1000 sets the batch size per request; the SDK auto-paginates.
     Existing entries (including deleted numbers) are preserved."""
-    records = client.incoming_phone_numbers.list(page_size=1000)
+    records = client.incoming_phone_numbers.stream(page_size=1000)
     count = 0
     for record in records:
         number_map[record.sid] = record.phone_number

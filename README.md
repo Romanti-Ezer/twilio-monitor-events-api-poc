@@ -43,6 +43,20 @@ Set credentials — copy `.env.example` to `.env` and fill in your values:
 cp .env.example .env
 ```
 
+The script supports two authentication methods:
+
+**Option 1 — API Key (recommended for automation)**  
+API Keys are scoped and revocable without affecting other integrations. Create one at [twilio.com/console/project/api-keys](https://www.twilio.com/console/project/api-keys).
+
+```
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_KEY=SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_API_SECRET=your_api_secret_here
+```
+
+**Option 2 — Auth Token (quick local testing only)**  
+The master Auth Token grants full account access. Avoid using it in automated environments.
+
 ```
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=your_auth_token_here
@@ -96,7 +110,8 @@ jobs:
       - run: python fetch_phone_number_events.py --range week
         env:
           TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-          TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+          TWILIO_API_KEY: ${{ secrets.TWILIO_API_KEY }}
+          TWILIO_API_SECRET: ${{ secrets.TWILIO_API_SECRET }}
       - uses: actions/upload-artifact@v4
         with:
           name: phone-number-report

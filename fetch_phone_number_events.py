@@ -50,15 +50,22 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # Load credentials
+    # Load credentials — API Key (recommended) or Auth Token
     account_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+    api_key = os.environ.get("TWILIO_API_KEY")
+    api_secret = os.environ.get("TWILIO_API_SECRET")
     auth_token = os.environ.get("TWILIO_AUTH_TOKEN")
-    if not account_sid or not auth_token:
-        print("ERROR: TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN must be set.", file=sys.stderr)
-        sys.exit(1)
 
-    # Set up Twilio client and date range
-    client = Client(account_sid, auth_token)
+    if not account_sid:
+        print("ERROR: TWILIO_ACCOUNT_SID must be set.", file=sys.stderr)
+        sys.exit(1)
+    if api_key and api_secret:
+        client = Client(api_key, api_secret, account_sid)
+    elif auth_token:
+        client = Client(account_sid, auth_token)
+    else:
+        print("ERROR: Set TWILIO_API_KEY + TWILIO_API_SECRET (recommended) or TWILIO_AUTH_TOKEN.", file=sys.stderr)
+        sys.exit(1)
     start, end = build_date_range(args.date_range)
 
     # Ensure output directory exists
@@ -75,7 +82,7 @@ def main():
     for event_type in PHONE_NUMBER_EVENT_TYPES:
         print(f"  {event_type} ... ", end="", flush=True)
         events = [
-            e for e in client.monitor.v1.events.list(
+            e for e in client.monitor.v1.events.stream(
                 event_type=event_type,
                 start_date=start,
                 end_date=end,
